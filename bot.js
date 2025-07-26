@@ -22,7 +22,7 @@ const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1) + min
     await page.goto(URL, { waitUntil: 'networkidle2' });
 
     try {
-      await page.type('input[name="wallet"]', wallet);
+      await page.type('input[name="account"]', wallet);
       await Promise.all([
         page.click('button[type="submit"]'),
         page.waitForTimeout(5000),
