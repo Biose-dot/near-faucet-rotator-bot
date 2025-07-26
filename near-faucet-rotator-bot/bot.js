@@ -1,43 +1,49 @@
+
 const puppeteer = require('puppeteer');
-const fs = require('fs');
+const wallets = require('./wallets.json');
 
-const WALLET_LIST_PATH = './wallets.txt';
-const URL = "https://near-faucet.io/";
+function delay(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
-const randomInt = (min, max) => Math.floor(Math.random() * (max - min + 1) + min);
+async function claimFaucet(wallet) {
+  const browser = await puppeteer.launch({
+    headless: true,
+    args: ['--no-sandbox', '--disable-setuid-sandbox']
+  });
 
-(async () => {
-  const wallets = fs.readFileSync(WALLET_LIST_PATH, 'utf-8').split('\n').map(x => x.trim()).filter(Boolean);
+  const page = await browser.newPage();
 
-  for (const wallet of wallets) {
-    console.log(`\n[${new Date().toISOString()}] Claiming for wallet: ${wallet}`);
+  try {
+    await page.goto('https://near-faucet.io/', { waitUntil: 'networkidle2' });
 
-    const browser = await puppeteer.launch({
-      headless: true,
-      args: ['--no-sandbox'],
-    });
+    await page.waitForSelector('input[name="wallet"]', { timeout: 10000 });
+    await page.type('input[name="wallet"]', wallet);
+    await page.click('button[type="submit"]');
 
-    const page = await browser.newPage();
-    await page.goto(URL, { waitUntil: 'networkidle2' });
+    await delay(10000); // wait 10 seconds
 
-    try {
-      await page.type('input[name="wallet"]', wallet);
-      await Promise.all([
-        page.click('button[type="submit"]'),
-        page.waitForTimeout(5000),
-      ]);
-      console.log(`✅ Claimed faucet for ${wallet}`);
-    } catch (err) {
-      console.error(`❌ Error for ${wallet}: ${err.message}`);
-    }
-
+    console.log(`✅ Claimed for ${wallet}`);
+  } catch (error) {
+    console.error(`❌ Error for ${wallet}:`, error.message);
+  } finally {
     await browser.close();
-
-    const waitTime = randomInt(30, 90);
-    console.log(`⏳ Waiting ${waitTime}s before next wallet...\n`);
-    await delay(waitTime * 1000);
   }
+}
 
-  console.log("🎉 Rotation finished.");
-})();
+async function main() {
+  while (true) {
+    console.log('🚀 Starting new rotation...');
+    for (const wallet of wallets) {
+      await claimFaucet(wallet);
+      const waitTime = 30000 + Math.random() * 20000;
+      console.log(`⏳ Waiting ${Math.round(waitTime / 1000)}s before next wallet...`);
+      await delay(waitTime);
+    }
+    const cycleWait = 3 * 60 * 60 * 1000;
+    console.log('🎉 Rotation finished. 🛌 Sleeping 3 hours before next full cycle...');
+    await delay(cycleWait);
+  }
+}
+
+main();
